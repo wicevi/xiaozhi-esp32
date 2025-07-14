@@ -19,14 +19,19 @@
 
 #define BOOT_BUTTON_GPIO        GPIO_NUM_35
 
-#define DISPLAY_WIDTH 800
-#define DISPLAY_HEIGHT 1280
+#if CONFIG_LCD_TYPE_720_1280_7_INCH
+    #define DISPLAY_WIDTH   720
+    #define DISPLAY_HEIGHT  1280
+#elif (CONFIG_LCD_TYPE_800_1280_10_1_INCH || CONFIG_LCD_TYPE_800_1280_10_1_INCH_A)
+    #define DISPLAY_WIDTH   800
+    #define DISPLAY_HEIGHT  1280
+#endif
 
 #define LCD_BIT_PER_PIXEL          (16)
 #define PIN_NUM_LCD_RST            GPIO_NUM_NC
 
 #define DELAY_TIME_MS                      (3000)
-#define LCD_MIPI_DSI_LANE_NUM          (2)    // 2 data lanes
+#define LCD_MIPI_DSI_LANE_NUM               (2)    // 2 data lanes
 
 #define MIPI_DSI_PHY_PWR_LDO_CHAN          (3)
 #define MIPI_DSI_PHY_PWR_LDO_VOLTAGE_MV    (2500)

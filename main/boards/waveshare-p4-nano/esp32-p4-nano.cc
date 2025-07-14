@@ -12,7 +12,11 @@
 #include "esp_ldo_regulator.h"
 
 #include "esp_lcd_mipi_dsi.h"
+#if CONFIG_LCD_TYPE_720_1280_7_INCH
+#include "esp_lcd_ili9881c.h"
+#elif (CONFIG_LCD_TYPE_800_1280_10_1_INCH || CONFIG_LCD_TYPE_800_1280_10_1_INCH_A)
 #include "esp_lcd_jd9365_10_1.h"
+#endif
 
 #include <wifi_station.h>
 #include <esp_log.h>
@@ -36,7 +40,7 @@ protected:
         uint8_t i2c_address = 0x45;     // 7-bit address
 #if CONFIG_LCD_TYPE_800_1280_10_1_INCH
         uint8_t reg = 0x86;
-#elif CONFIG_LCD_TYPE_800_1280_10_1_INCH_A
+#elif (CONFIG_LCD_TYPE_800_1280_10_1_INCH_A || CONFIG_LCD_TYPE_720_1280_7_INCH)
         uint8_t reg = 0x96;
 #endif
         uint8_t data[2] = {reg, brightness};
@@ -110,14 +114,57 @@ private:
         esp_lcd_panel_handle_t disp_panel = NULL;
 
         esp_lcd_dsi_bus_handle_t mipi_dsi_bus = NULL;
+    #if CONFIG_LCD_TYPE_720_1280_7_INCH
+        esp_lcd_dsi_bus_config_t bus_config = ILI9881C_PANEL_BUS_DSI_2CH_CONFIG();
+    #elif (CONFIG_LCD_TYPE_800_1280_10_1_INCH || CONFIG_LCD_TYPE_800_1280_10_1_INCH_A)
         esp_lcd_dsi_bus_config_t bus_config = JD9365_PANEL_BUS_DSI_2CH_CONFIG();
+    #endif
         esp_lcd_new_dsi_bus(&bus_config, &mipi_dsi_bus);
 
         ESP_LOGI(TAG, "Install MIPI DSI LCD control panel");
         // we use DBI interface to send LCD commands and parameters
+    #if CONFIG_LCD_TYPE_720_1280_7_INCH
+        esp_lcd_dbi_io_config_t dbi_config = ILI9881C_PANEL_IO_DBI_CONFIG();
+    #elif (CONFIG_LCD_TYPE_800_1280_10_1_INCH || CONFIG_LCD_TYPE_800_1280_10_1_INCH_A)
         esp_lcd_dbi_io_config_t dbi_config = JD9365_PANEL_IO_DBI_CONFIG();
+    #endif
         esp_lcd_new_panel_io_dbi(mipi_dsi_bus, &dbi_config, &io);
 
+    #if CONFIG_LCD_TYPE_720_1280_7_INCH
+        esp_lcd_dpi_panel_config_t dpi_config = {
+            .dpi_clk_src = MIPI_DSI_DPI_CLK_SRC_DEFAULT,
+            .dpi_clock_freq_mhz = 80,
+            .pixel_format = LCD_COLOR_PIXEL_FORMAT_RGB565,
+            .num_fbs = 1,
+            .video_timing = {
+                .h_size = 720,
+                .v_size = 1280,
+                .hsync_pulse_width = 50,
+                .hsync_back_porch = 239,
+                .hsync_front_porch = 33,
+                .vsync_pulse_width = 30,
+                .vsync_back_porch = 20,
+                .vsync_front_porch = 2,
+            },
+            .flags = {
+                .use_dma2d = true,
+            },
+        };
+        ili9881c_vendor_config_t vendor_config = {
+            .mipi_config = {
+                .dsi_bus = mipi_dsi_bus,
+                .dpi_config = &dpi_config,
+                .lane_num = 2,
+            },
+        };
+        const esp_lcd_panel_dev_config_t panel_config = {
+            .reset_gpio_num = -1,
+            .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
+            .bits_per_pixel = 16,
+            .vendor_config = &vendor_config,
+        };
+        esp_lcd_new_panel_ili9881c(io, &panel_config, &disp_panel);
+    #elif (CONFIG_LCD_TYPE_800_1280_10_1_INCH || CONFIG_LCD_TYPE_800_1280_10_1_INCH_A)
         esp_lcd_dpi_panel_config_t dpi_config = {
             .dpi_clk_src = MIPI_DSI_DPI_CLK_SRC_DEFAULT,
             .dpi_clock_freq_mhz = 80,
@@ -138,6 +185,7 @@ private:
             },
         };
 
+
         jd9365_vendor_config_t vendor_config = {
 
             .mipi_config = {
@@ -157,6 +205,7 @@ private:
             .vendor_config = &vendor_config,
         };
         esp_lcd_new_panel_jd9365(io, &lcd_dev_config, &disp_panel);
+    #endif
         esp_lcd_panel_reset(disp_panel);
         esp_lcd_panel_init(disp_panel);
 

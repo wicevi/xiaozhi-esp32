@@ -59,10 +59,6 @@ dependencies:
     version: '*'
     rules:
     - if: target in [esp32p4]
-  espressif/esp_lcd_ili9881c:
-    version: ^1.0.1
-    rules:
-    - if: target in [esp32p4]
   espressif/esp_wifi_remote:
     version: '*'
     rules:
@@ -75,3 +71,4 @@ dependencies:
   ## Required IDF version
   idf:
     version: '>=5.4.0'
+  waveshare/esp_lcd_ili9881c: '*'
