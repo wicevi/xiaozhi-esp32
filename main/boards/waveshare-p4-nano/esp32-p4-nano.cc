@@ -8,23 +8,31 @@
 #include "iot/thing_manager.h"
 
 #include "esp_lcd_panel_ops.h"
-#include "esp_lcd_mipi_dsi.h"
 #include "esp_ldo_regulator.h"
 
+#if CONFIG_LCD_GC9A01_240X240
+#include "esp_lcd_gc9a01.h"
+#else
 #include "esp_lcd_mipi_dsi.h"
 #if CONFIG_LCD_TYPE_720_1280_7_INCH
 #include "esp_lcd_ili9881c.h"
 #elif (CONFIG_LCD_TYPE_800_1280_10_1_INCH || CONFIG_LCD_TYPE_800_1280_10_1_INCH_A)
 #include "esp_lcd_jd9365_10_1.h"
 #endif
+#include "esp_lcd_touch_gt911.h"
+#endif
 
 #include <wifi_station.h>
 #include <esp_log.h>
 #include <driver/i2c_master.h>
 #include <esp_lvgl_port.h>
-#include "esp_lcd_touch_gt911.h"
+
 #define TAG "WaveshareEsp32p4nano"
 
+#if CONFIG_LCD_GC9A01_240X240
+LV_FONT_DECLARE(font_puhui_16_4);
+LV_FONT_DECLARE(font_awesome_16_4);
+#else
 LV_FONT_DECLARE(font_puhui_20_4);
 LV_FONT_DECLARE(font_awesome_20_4);
 
@@ -68,13 +76,24 @@ protected:
         // i2c_master_bus_rm_device(dev_handle);
     }
 };
+#endif
 
 class WaveshareEsp32p4nano : public WifiBoard {
 private:
     i2c_master_bus_handle_t codec_i2c_bus_;
     Button boot_button_;
     LcdDisplay *display__;
+#if !CONFIG_LCD_GC9A01_240X240
     CustomBacklight *backlight_;
+#endif
+
+#if CONFIG_LCD_GC9A01_240X240
+    void InitializeSpi() {
+        const spi_bus_config_t buscfg = GC9A01_PANEL_BUS_SPI_CONFIG(DISPLAY_CLK_PIN, DISPLAY_MOSI_PIN,
+                                    DISPLAY_HEIGHT * 80 * LCD_BIT_PER_PIXEL / 8);
+        ESP_ERROR_CHECK(spi_bus_initialize(DISPLAY_SPI_HOST, &buscfg, SPI_DMA_CH_AUTO));
+    }
+#endif
 
     void InitializeCodecI2c() {
         // Initialize I2C peripheral
@@ -104,15 +123,53 @@ private:
         esp_ldo_acquire_channel(&ldo_cfg, &phy_pwr_chan);
         ESP_LOGI(TAG, "MIPI DSI PHY Powered on");
 #endif // BSP_MIPI_DSI_PHY_PWR_LDO_CHAN > 0
-
         return ESP_OK;
     }
 
     void InitializeLCD() {
+#if CONFIG_LCD_GC9A01_240X240
+        esp_lcd_panel_io_handle_t panel_io = nullptr;
+        // 液晶屏控制IO初始化
+        ESP_LOGD(TAG, "Install panel IO");
+        const esp_lcd_panel_io_spi_config_t io_config = GC9A01_PANEL_IO_SPI_CONFIG(DISPLAY_CS_PIN, DISPLAY_DC_PIN, NULL, NULL);
+        ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi(DISPLAY_SPI_HOST, &io_config, &panel_io));
+
+        // 初始化液晶屏驱动芯片
+        ESP_LOGD(TAG, "Install LCD driver");
+        esp_lcd_panel_handle_t panel = nullptr;
+        const esp_lcd_panel_dev_config_t panel_config = {
+            .reset_gpio_num = DISPLAY_RST_PIN,
+        #if ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(5, 0, 0)
+            .color_space = ESP_LCD_COLOR_SPACE_BGR,
+        #else
+            .rgb_endian = LCD_RGB_ENDIAN_BGR,
+        #endif
+            .bits_per_pixel = LCD_BIT_PER_PIXEL,
+        };
+        ESP_ERROR_CHECK(esp_lcd_new_panel_gc9a01(panel_io, &panel_config, &panel));
+        
+        esp_lcd_panel_reset(panel);
+        esp_lcd_panel_init(panel);
+        esp_lcd_panel_invert_color(panel, DISPLAY_INVERT_COLOR);
+        esp_lcd_panel_mirror(panel, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y);
+        esp_lcd_panel_disp_on_off(panel, true);
+    #if ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(5, 0, 0)
+        ESP_ERROR_CHECK(esp_lcd_panel_disp_off(panel, false));
+    #else
+        ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel, true));
+    #endif
+    display__ = new SpiLcdDisplay(panel_io, panel,
+                                    DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY,
+                                    {
+                                        .text_font = &font_puhui_16_4,
+                                        .icon_font = &font_awesome_16_4,
+                                        .emoji_font = font_emoji_64_init(),
+                                    });
+#else
         bsp_enable_dsi_phy_power();
         esp_lcd_panel_io_handle_t io = NULL;
         esp_lcd_panel_handle_t disp_panel = NULL;
-
+    
         esp_lcd_dsi_bus_handle_t mipi_dsi_bus = NULL;
     #if CONFIG_LCD_TYPE_720_1280_7_INCH
         esp_lcd_dsi_bus_config_t bus_config = ILI9881C_PANEL_BUS_DSI_2CH_CONFIG();
@@ -218,7 +275,10 @@ private:
                                        });
         backlight_ = new CustomBacklight(codec_i2c_bus_);
         backlight_->RestoreBrightness();
+#endif
     }
+
+#if !CONFIG_LCD_GC9A01_240X240
     void InitializeTouch()
     {
         esp_lcd_touch_handle_t tp;
@@ -250,6 +310,7 @@ private:
         lvgl_port_add_touch(&touch_cfg);
         ESP_LOGI(TAG, "Touch panel initialized successfully");
     }
+#endif
     void InitializeButtons() {
         boot_button_.OnClick([this]() {
             auto& app = Application::GetInstance();
@@ -271,8 +332,13 @@ public:
         boot_button_(BOOT_BUTTON_GPIO) {
         InitializeCodecI2c();
         InitializeIot();
+    #if CONFIG_LCD_GC9A01_240X240
+        InitializeSpi();
+    #endif
         InitializeLCD();
+    #if !CONFIG_LCD_GC9A01_240X240
         InitializeTouch();
+    #endif
         InitializeButtons();
     }
 
@@ -288,8 +354,16 @@ public:
     }
 
     virtual Backlight *GetBacklight() override {
-         return backlight_;
-     }
+    #if CONFIG_LCD_GC9A01_240X240
+        if (DISPLAY_BACKLIGHT_PIN != GPIO_NUM_NC) {
+            static PwmBacklight backlight(DISPLAY_BACKLIGHT_PIN, DISPLAY_BACKLIGHT_OUTPUT_INVERT);
+            return &backlight;
+        }
+        return nullptr;
+    #else
+        return backlight_;
+    #endif
+    }
 };
 
 DECLARE_BOARD(WaveshareEsp32p4nano);
