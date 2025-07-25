@@ -26,8 +26,31 @@
 #include <esp_log.h>
 #include <driver/i2c_master.h>
 #include <esp_lvgl_port.h>
+#include "home_ctrl.h"
+#include "wic_camera.h"
 
 #define TAG "WaveshareEsp32p4nano"
+
+class CustomHomeCtrl : public HomeCtrl {
+    public:
+    CustomHomeCtrl() : HomeCtrl() {
+        gpio_config_t io_conf = {};
+        io_conf.intr_type = GPIO_INTR_DISABLE;
+        io_conf.mode = GPIO_MODE_OUTPUT;
+        io_conf.pin_bit_mask = (1ULL << HOME_LAMP_CTRL_GPIO);
+        io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+        io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
+        ESP_ERROR_CHECK(gpio_config(&io_conf));
+        ESP_ERROR_CHECK(gpio_set_level(HOME_LAMP_CTRL_GPIO, 0));
+        lamp_state_ = false;
+        ESP_LOGI(TAG, "HomeCtrl initialized with GPIO %d", HOME_LAMP_CTRL_GPIO);
+    }
+    void CtrlLamp(bool state) override {
+        ESP_LOGI(TAG, "Setting lamp state to %d", state);
+        gpio_set_level(HOME_LAMP_CTRL_GPIO, state ? 1 : 0);
+        lamp_state_ = state;
+    }
+};
 
 #if CONFIG_LCD_GC9A01_240X240
 LV_FONT_DECLARE(font_puhui_16_4);
@@ -82,7 +105,9 @@ class WaveshareEsp32p4nano : public WifiBoard {
 private:
     i2c_master_bus_handle_t codec_i2c_bus_;
     Button boot_button_;
-    LcdDisplay *display__;
+    LcdDisplay *display_;
+    CustomHomeCtrl *home_ctrl_;
+    WicCamera *camera_;
 #if !CONFIG_LCD_GC9A01_240X240
     CustomBacklight *backlight_;
 #endif
@@ -158,7 +183,7 @@ private:
     #else
         ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel, true));
     #endif
-    display__ = new SpiLcdDisplay(panel_io, panel,
+    display_ = new SpiLcdDisplay(panel_io, panel,
                                     DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY,
                                     {
                                         .text_font = &font_puhui_16_4,
@@ -266,7 +291,7 @@ private:
         esp_lcd_panel_reset(disp_panel);
         esp_lcd_panel_init(disp_panel);
 
-        display__ = new MipiLcdDisplay(io, disp_panel, DISPLAY_WIDTH, DISPLAY_HEIGHT,
+        display_ = new MipiLcdDisplay(io, disp_panel, DISPLAY_WIDTH, DISPLAY_HEIGHT,
                                        DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY,
                                        {
                                            .text_font = &font_puhui_20_4,
@@ -332,6 +357,7 @@ public:
         boot_button_(BOOT_BUTTON_GPIO) {
         InitializeCodecI2c();
         InitializeIot();
+        camera_ = new WicCamera(codec_i2c_bus_);
     #if CONFIG_LCD_GC9A01_240X240
         InitializeSpi();
     #endif
@@ -340,6 +366,7 @@ public:
         InitializeTouch();
     #endif
         InitializeButtons();
+        home_ctrl_ = new CustomHomeCtrl();
     }
 
     virtual AudioCodec *GetAudioCodec() override {
@@ -350,7 +377,7 @@ public:
     }
 
     virtual Display *GetDisplay() override {
-        return display__;
+        return display_;
     }
 
     virtual Backlight *GetBacklight() override {
@@ -363,6 +390,14 @@ public:
     #else
         return backlight_;
     #endif
+    }
+
+    virtual HomeCtrl *GetHomeCtrl() override {
+        return home_ctrl_;
+    }
+
+    virtual Camera* GetCamera() override {
+        return camera_;
     }
 };
 

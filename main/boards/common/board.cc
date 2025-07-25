@@ -57,6 +57,10 @@ Display* Board::GetDisplay() {
     return &display;
 }
 
+HomeCtrl* Board::GetHomeCtrl() {
+    return nullptr;
+}
+
 Camera* Board::GetCamera() {
     return nullptr;
 }

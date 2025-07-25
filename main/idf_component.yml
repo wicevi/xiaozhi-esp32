@@ -55,6 +55,12 @@ dependencies:
     version: '*'
     rules:
     - if: target in [esp32p4]
+
+  waveshare/esp_lcd_hx8394:
+    version: '^1.0.2'
+    rules:
+    - if: target in [esp32p4]
+  
   waveshare/esp_lcd_st7703:
     version: '*'
     rules:
@@ -72,3 +78,4 @@ dependencies:
   idf:
     version: '>=5.4.0'
   waveshare/esp_lcd_ili9881c: '*'
+  espressif/esp_cam_sensor: '*'

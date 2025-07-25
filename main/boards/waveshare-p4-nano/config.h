@@ -3,8 +3,8 @@
 
 #include <driver/gpio.h>
 
-#define AUDIO_INPUT_SAMPLE_RATE  24000
-#define AUDIO_OUTPUT_SAMPLE_RATE 24000
+#define AUDIO_INPUT_SAMPLE_RATE     16000
+#define AUDIO_OUTPUT_SAMPLE_RATE    16000
 
 #define AUDIO_I2S_GPIO_MCLK         GPIO_NUM_13
 #define AUDIO_I2S_GPIO_WS           GPIO_NUM_10
@@ -18,6 +18,7 @@
 #define AUDIO_CODEC_ES8311_ADDR     ES8311_CODEC_DEFAULT_ADDR
 
 #define BOOT_BUTTON_GPIO            GPIO_NUM_35
+#define HOME_LAMP_CTRL_GPIO         GPIO_NUM_36
 
 #define LCD_BIT_PER_PIXEL           (16)
 #ifdef CONFIG_LCD_GC9A01_240X240
@@ -28,17 +29,17 @@
 #define DISPLAY_DC_PIN              GPIO_NUM_21
 #define DISPLAY_RST_PIN             GPIO_NUM_20
 #define DISPLAY_CS_PIN              GPIO_NUM_22
-#define DISPLAY_WIDTH           240
-#define DISPLAY_HEIGHT          240
-#define DISPLAY_MIRROR_X        true
-#define DISPLAY_MIRROR_Y        false
-#define DISPLAY_SWAP_XY         false
-#define DISPLAY_INVERT_COLOR    true
-#define DISPLAY_RGB_ORDER       LCD_RGB_ELEMENT_ORDER_BGR
-#define DISPLAY_OFFSET_X        0
-#define DISPLAY_OFFSET_Y        0
+#define DISPLAY_WIDTH               240
+#define DISPLAY_HEIGHT              240
+#define DISPLAY_MIRROR_X            true
+#define DISPLAY_MIRROR_Y            false
+#define DISPLAY_SWAP_XY             false
+#define DISPLAY_INVERT_COLOR        true
+#define DISPLAY_RGB_ORDER           LCD_RGB_ELEMENT_ORDER_BGR
+#define DISPLAY_OFFSET_X            0
+#define DISPLAY_OFFSET_Y            0
 #define DISPLAY_BACKLIGHT_OUTPUT_INVERT     false
-#define DISPLAY_SPI_MODE        0
+#define DISPLAY_SPI_MODE            0
 
 #else
 

@@ -273,6 +273,14 @@ std::string WifiBoard::GetDeviceStatusJson() {
         cJSON_AddItemToObject(root, "chip", chip);
     }
 
+    // home ctrl properties
+    auto home_ctrl = board.GetHomeCtrl();
+    if (home_ctrl) {
+        auto home_ctrl_properties = cJSON_CreateObject();
+        cJSON_AddBoolToObject(home_ctrl_properties, "lampstate", home_ctrl->lampState());
+        cJSON_AddItemToObject(root, "home_ctrl", home_ctrl_properties);
+    }
+
     auto json_str = cJSON_PrintUnformatted(root);
     std::string json(json_str);
     cJSON_free(json_str);

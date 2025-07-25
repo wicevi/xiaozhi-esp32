@@ -103,6 +103,20 @@ void McpServer::AddCommonTools() {
             });
     }
 
+    AddTool("self.home_ctrl.ctrl_lamp", 
+        "Control lighting of the home ctrl. If the current lampstate is unknown, you must call `self.get_device_status` tool first and then call this tool.",
+        PropertyList({
+            Property("lampstate", kPropertyTypeBoolean)
+        }), 
+        [&board](const PropertyList& properties) -> ReturnValue {
+            auto home_ctrl = board.GetHomeCtrl();
+            if (!home_ctrl) {   
+                return "{\"success\": false, \"message\": \"Home control not available\"}";
+            }
+            home_ctrl->ctrlLamp(properties["lampstate"].value<bool>());
+            return true;
+        });
+
     // Restore the original tools list to the end of the tools list
     tools_.insert(tools_.end(), original_tools.begin(), original_tools.end());
 }
@@ -336,9 +350,13 @@ void McpServer::DoToolCall(int id, const std::string& tool_name, const cJSON* to
             }
 
             if (!argument.has_default_value() && !found) {
-                ESP_LOGE(TAG, "tools/call: Missing valid argument: %s", argument.name().c_str());
-                ReplyError(id, "Missing valid argument: " + argument.name());
-                return;
+                if (strcmp(argument.name().c_str(), "question") == 0) {
+                    ESP_LOGW(TAG, "tools/call: Missing valid argument: %s", argument.name().c_str());
+                } else {
+                    ESP_LOGE(TAG, "tools/call: Missing valid argument: %s", argument.name().c_str());
+                    ReplyError(id, "Missing valid argument: " + argument.name());
+                    return;
+                }
             }
         }
     } catch (const std::exception& e) {
